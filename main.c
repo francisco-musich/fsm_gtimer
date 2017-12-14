@@ -22,16 +22,19 @@
 #define baj_pr 'b'
 #define mov_pr 'm'
 #define gir_pr 'r'
-
+#define TAMCOLAEVENTO 100
 /****************************
  * DECALARACION VAIRABLES GLOBALES*
  * ************************* * * */
 char arreglo[50];       //Prueba para ver si responde
-int cola_ev[50];        //Cola de eventos
-int indice_arr;         // Indice para arreglo de prueba
+char cola_ev[TAMCOLAEVENTO];        //Cola de eventos
+int indice_arr =0;         // Indice para arreglo de prueba
 
-int TimerTick;
+char*pevento = cola_ev;
+
+int ticker;
 int  counter;
+int running = 1;
 
 /*************************************
  * PROTOTIPOS FUNCIONES DE TRANSICION *
@@ -39,6 +42,8 @@ int  counter;
 void fun_baj(void);     //Dummies
 void fun_gir(void);
 void fun_mov(void);
+void fun_exit(void);
+void limp_cola_ev(void);
 
 /*****************************************************
 *       DEFINICION DE TIPO ARISTA                   *
@@ -79,16 +84,16 @@ extern arista_t estado_menu[];
 arista_t estado_juego[] =
 {
     {bajar,estado_juego,fun_baj},
-    {girar,estado_juego,fun_gir},
+    {girar,estado_juego,limp_cola_ev},
     {mover,estado_juego,fun_mov},
     {FIN_TABLA,estado_juego,}
 };
-/*arista_t estado_2[]=
+arista_t estado_pausa[]=
 {
-    {'1',estado_3,pr_suc},
-    {FIN_TABLA,estado_ini,pr_pif}
+    {bajar,estado_juego,fun_gir},
+    {FIN_TABLA,estado_pausa,}
 };
-arista_t estado_3[]=
+/*arista_t estado_3[]=
 {
     {'5',estado_ini,pr_match},
     {FIN_TABLA,estado_ini,pr_pif}
@@ -97,7 +102,7 @@ arista_t estado_3[]=
 /****************************
  * HANDLER COLA DE EVENTOS  *
  * **************************/
-int get_ev(void);
+int get_ev(char modo);
 
 /***************************
  * MAIN                     *
@@ -129,17 +134,19 @@ int main()
 
 void *timer()           //CADA MEDIO SEGUNDO GUARDA EN LA COLA DE EVENTOS UN 1
 {
+    int dificultad = 5;
     while(1)
         {
                
-            usleep(100); // 100ms * 
+            usleep(100); // NUMEROS MAGICOS PERO FUNCIONAN
 
-            if (TimerTick)
-		TimerTick--;
+            if (ticker)
+		ticker--;
             else
             {  
-                cola_ev[counter++] = 1;        // 
-                TimerTick=500;            
+                *(pevento++) = bajar;//uso puntero que agrega eventos para agregar evento de bajar
+                ticker= dificultad*100;    //dificultad es inversamente proporcional con el tiempo entre tick   
+                *(pevento++) = girar;
             }
         }
 }
@@ -148,18 +155,20 @@ void *timer()           //CADA MEDIO SEGUNDO GUARDA EN LA COLA DE EVENTOS UN 1
  */
 void* juego_matrices(void)
 {
-arista_t *estado_actual = estado_juego;
+arista_t *estado_actual = estado_juego; //creo puntero a estado, y lo inicializo en juego(deberia ir en estado_menu)
     
     int evento;
-    while(1)
+    while(running)  //chequeo que el programa deba seguir corriendo
     {
-        while(evento = get_ev())
+        while((evento = get_ev(1))&&(running)) //chequeo que haya algo en la cola, y que no se haya elejido salir del juego
         {
             estado_actual = fsm(estado_actual,evento);
+            
         }
     }
     return 0;
 }
+
 
 
 /***********************
@@ -190,24 +199,43 @@ void fun_mov(void) {
  * FUNCION GET_EV      *
  *  * * * *  * * * * * * * */
 
-int get_ev()
+int get_ev(char modo)       //recibo modo asi evito mas globales(leo evento modo=1, modo = 0 limpio indice)
 {
-  static int indice;
-  int respuesta;
-  if(cola_ev[indice])
+  static int indice = 0;        //indice para lectura de eventos
+  int respuesta= 0;
+  if(modo)
   {
-    respuesta = cola_ev[indice++];
+    if(cola_ev[indice])     //si hay algo en la cola de eventos devuelvo la cola de eventos e incremento el indice
+    {
+      respuesta = cola_ev[indice++];    //si no hay nada devuelve el evento 0, que coincide con FINTABLA, entonces la fsm no hace nada y espera el proximo evento
+    }
   }
   else
   {
-      respuesta = 0;
+      indice =0;
   }
   
   
   return respuesta;
 }
 
+/*******************************************************************************
+ * FUNCION QUE TERMINA EL PROGRAMA
+ * *****************************************************/
+void fun_exit(void)
+{
+    running = 0;        //apago el flag que mantiene los loops
+}
 
+void limp_cola_ev(void)
+{
+   int i;
+   for (i=0;i<TAMCOLAEVENTO;i++){ //limpio la cola de eventos
+       cola_ev[i] = 0;
+   }
+   get_ev(0);       //limpio variable estatica dentro de get_ev
+   pevento = cola_ev;       // reseteo puntero que guarda eventos al inicio de la cola
+}
 
 
 
